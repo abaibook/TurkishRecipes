@@ -283,55 +283,6 @@ const handleRestore = async () => {
             {t('restorePurchases', language)}
           </Text>
         </TouchableOpacity>
-{/* ТЕСТОВАЯ КНОПКА */}
-<TouchableOpacity
-  style={[styles.restoreButton, { 
-    backgroundColor: '#FF6B6B', 
-    padding: 15, 
-    borderRadius: 10,
-    marginTop: 20 
-  }]}
-  onPress={async () => {
-    console.log('🧪 === TEST BUTTON PRESSED ===');
-    Alert.alert('Testing...', 'Check terminal logs');
-    
-    try {
-      const RNIap = require('react-native-iap');
-      
-      console.log('🧪 Test 1: Init connection...');
-      const isConnected = await RNIap.initConnection();
-      console.log('Result:', isConnected);
-      
-      console.log('🧪 Test 2: Load products...');
-      const products = await RNIap.getProducts({ 
-        skus: ['premium-access'] 
-      });
-      console.log('Result:', products);
-      
-      if (products && products.length > 0) {
-        Alert.alert(
-          '✅ SUCCESS!', 
-          `Found product:\n${products[0].title}\nPrice: ${products[0].localizedPrice}`
-        );
-      } else {
-        Alert.alert(
-          '❌ NO PRODUCTS', 
-          'Product not found in Google Play Console!\n\nCheck:\n1. Product ID: premium-access\n2. App published\n3. Test account'
-        );
-      }
-    } catch (error) {
-      console.error('🧪 Test failed:', error);
-      Alert.alert('❌ ERROR', error.message);
-    }
-  }}
->
-  <Text style={[styles.restoreButtonText, { 
-    color: '#FFF', 
-    fontWeight: 'bold' 
-  }]}>
-    🧪 TEST IAP CONNECTION
-  </Text>
-</TouchableOpacity>
 
         {/* Гарантии */}
         <View style={styles.guaranteeSection}>

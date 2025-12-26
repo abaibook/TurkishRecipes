@@ -4,15 +4,24 @@ import { usePremium } from './PremiumContext';
 export const usePremiumPrice = () => {
   const { products } = usePremium();
   
-  // Цена ТОЛЬКО из магазина, без запасного варианта
-  const price = products[0]?.localizedPrice || '...'; // Если нет - покажет "..."
-  const oldPrice = products[0]?.localizedPrice ? 
-    (parseFloat(products[0].price) * 1.67).toFixed(2) + ' ' + products[0].currencyCode : 
-    '...';
+  // В версии 14+ структура продукта:
+  // - localizedPrice (строка с символом валюты, например "$4.99")
+  // - price (число, например "4.99")
+  // - currency (код валюты, например "USD")
+  
+  const product = products && products.length > 0 ? products[0] : null;
+  
+  // Цена из магазина
+  const price = product?.localizedPrice || '...';
+  
+  // Старая цена (умножаем на 1.67)
+  const oldPrice = product?.price && product?.currency
+    ? `${(parseFloat(product.price) * 1.67).toFixed(2)} ${product.currency}`
+    : '...';
   
   return {
     price,
     oldPrice,
-    hasPrice: !!products[0]?.localizedPrice, // true если цена загрузилась
+    hasPrice: !!product?.localizedPrice,
   };
 };

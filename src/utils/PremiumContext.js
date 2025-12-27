@@ -1,254 +1,181 @@
 // src/utils/PremiumContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert } from 'react-native';
-import {
-  setup,
-  initConnection,
-  endConnection,
-  flushFailedPurchasesCachedAsPendingAndroid,
-  purchaseUpdatedListener,
-  purchaseErrorListener,
-  finishTransaction,
-  getProducts as getProductsV14,
-  requestPurchase as requestPurchaseV14,
-  getAvailablePurchases as getAvailablePurchasesV14,
-  withIAPContext,
-} from 'react-native-iap';
+import { Platform } from 'react-native';
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 const PremiumContext = createContext();
 
-// ID продуктов
-const PRODUCT_IDS = Platform.select({
-  ios: ['premium-access'],
-  android: ['premium-access'],
+// API ключи из RevenueCat Dashboard
+const REVENUE_CAT_API_KEY = Platform.select({
+  ios: 'test_bkdEHCGHPYHAiZDLbiCZEVOiyRc',
+  android: 'test_bkdEHCGHPYHAiZDLbiCZEVOiyRc',
 });
 
-const PremiumProviderBase = ({ children }) => {
+// Имя entitlement из RevenueCat Dashboard
+const ENTITLEMENT_ID = 'Turkish Recipes Pro'; // Точно как в Dashboard!
+
+export const PremiumProvider = ({ children }) => {
   const [hasPremium, setHasPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState([]);
-  const [purchaseUpdateSubscription, setPurchaseUpdateSubscription] = useState(null);
-  const [purchaseErrorSubscription, setPurchaseErrorSubscription] = useState(null);
 
   useEffect(() => {
-    initIAP();
-    
-    return () => {
-      if (purchaseUpdateSubscription) {
-        purchaseUpdateSubscription.remove();
-      }
-      if (purchaseErrorSubscription) {
-        purchaseErrorSubscription.remove();
-      }
-      endConnection();
-    };
+    initRevenueCat();
   }, []);
 
-  const initIAP = async () => {
+  const initRevenueCat = async () => {
     try {
-      console.log('🔌 Step 1: Connecting to IAP...');
+      console.log('🔌 Initializing RevenueCat...');
+      
+      // Включить детальные логи (для разработки)
+      Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
       
       // Инициализация
-      await initConnection();
-      console.log('✅ IAP Connected');
+      await Purchases.configure({ apiKey: REVENUE_CAT_API_KEY });
+      console.log('✅ RevenueCat initialized');
 
-      // Для Android: очистить незавершенные покупки
-      if (Platform.OS === 'android') {
-        await flushFailedPurchasesCachedAsPendingAndroid();
-      }
-
-      // Загрузить статус
-      await loadPremiumStatus();
+      // Проверить статус premium
+      await checkPremiumStatus();
 
       // Загрузить продукты
       await loadProducts();
 
-      // Проверить существующие покупки
-      await checkPurchases();
-
-      // Подписаться на обновления покупок
-      const updateSubscription = purchaseUpdatedListener(async (purchase) => {
-        console.log('🔔 Purchase updated:', purchase);
-        
-        const receipt = purchase.transactionReceipt || purchase.purchaseToken;
-        
-        if (receipt) {
-          try {
-            // Завершить транзакцию
-            await finishTransaction({ purchase, isConsumable: false });
-            
-            // Активировать премиум
-            await AsyncStorage.setItem('hasPremium', 'true');
-            setHasPremium(true);
-            
-            console.log('✅ Purchase completed successfully!');
-            Alert.alert('Success!', 'Premium activated!');
-          } catch (error) {
-            console.error('❌ Error finishing transaction:', error);
-          }
-        }
-      });
-      
-      const errorSubscription = purchaseErrorListener((error) => {
-        console.warn('⚠️ Purchase error:', error);
-        if (error.code !== 'E_USER_CANCELLED') {
-          Alert.alert('Purchase Error', error.message);
-        }
-      });
-
-      setPurchaseUpdateSubscription(updateSubscription);
-      setPurchaseErrorSubscription(errorSubscription);
-
     } catch (error) {
-      console.error('❌ IAP Init Error:', error);
-      console.error('Error message:', error.message);
+      console.error('❌ RevenueCat init error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadPremiumStatus = async () => {
+  const checkPremiumStatus = async () => {
     try {
-      const premiumStatus = await AsyncStorage.getItem('hasPremium');
-      if (premiumStatus === 'true') {
-        setHasPremium(true);
-        console.log('✅ Premium status loaded from storage');
+      const customerInfo = await Purchases.getCustomerInfo();
+      console.log('📊 Customer info:', customerInfo);
+      
+      // Проверяем entitlement "Turkish Recipes Pro"
+      const isPremium = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      
+      setHasPremium(isPremium);
+      
+      if (isPremium) {
+        await AsyncStorage.setItem('hasPremium', 'true');
+        console.log('✅ User has premium access');
+      } else {
+        console.log('ℹ️ User does not have premium');
       }
     } catch (error) {
-      console.error('Error loading premium status:', error);
+      console.error('❌ Error checking premium status:', error);
     }
   };
 
   const loadProducts = async () => {
     try {
-      console.log('🔍 Step 2: Loading products...');
-      console.log('📦 Product IDs:', PRODUCT_IDS);
+      console.log('🔍 Loading products...');
       
-      // В версии 14+ используется getProducts напрямую
-      const productList = await getProductsV14({ skus: PRODUCT_IDS });
+      const offerings = await Purchases.getOfferings();
+      console.log('📦 Offerings:', offerings);
       
-      console.log('📦 Step 3: Products received:', productList);
-      console.log('📦 Number of products:', productList ? productList.length : 0);
-      
-      if (productList && productList.length > 0) {
-        productList.forEach((product, index) => {
-          console.log(`💰 Product ${index + 1}:`, {
-            productId: product.productId,
-            title: product.title,
-            description: product.description,
-            price: product.price,
-            currency: product.currency,
-            localizedPrice: product.localizedPrice,
+      if (offerings.current && offerings.current.availablePackages.length > 0) {
+        const packages = offerings.current.availablePackages;
+        console.log('✅ Available packages:', packages.length);
+        
+        // Конвертируем в формат для UI
+        const productsForUI = packages.map(pkg => {
+          console.log('💰 Package:', {
+            identifier: pkg.identifier,
+            product: pkg.product.identifier,
+            title: pkg.product.title,
+            price: pkg.product.priceString,
           });
+          
+          return {
+            productId: pkg.product.identifier,
+            title: pkg.product.title,
+            description: pkg.product.description,
+            price: pkg.product.price,
+            localizedPrice: pkg.product.priceString,
+            currency: pkg.product.currencyCode,
+            packageIdentifier: pkg.identifier, // Сохраняем для покупки
+          };
         });
         
-        setProducts(productList);
+        setProducts(productsForUI);
+        console.log('✅ Products loaded for UI');
       } else {
-        console.warn('⚠️ No products found!');
-        console.warn('Check:');
-        console.warn('1. Product ID in Google Play Console: premium-access');
-        console.warn('2. App published to internal testing');
-        console.warn('3. Test account added');
+        console.warn('⚠️ No offerings found. Check RevenueCat Dashboard.');
       }
-      
     } catch (error) {
       console.error('❌ Error loading products:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-    }
-  };
-
-  const checkPurchases = async () => {
-    try {
-      console.log('🔍 Checking existing purchases...');
-      
-      const purchases = await getAvailablePurchasesV14();
-      console.log('📋 Available purchases:', purchases);
-
-      if (purchases && purchases.length > 0) {
-        const hasPurchased = purchases.some((purchase) =>
-          PRODUCT_IDS.includes(purchase.productId)
-        );
-
-        if (hasPurchased) {
-          await AsyncStorage.setItem('hasPremium', 'true');
-          setHasPremium(true);
-          console.log('✅ Premium restored from purchase history');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking purchases:', error);
     }
   };
 
   const purchasePremium = async () => {
     try {
-      console.log('🛒 Step 1: Starting purchase...');
-      
-      // Проверить продукты
-      if (!products || products.length === 0) {
-        console.warn('⚠️ Products not loaded, loading now...');
-        await loadProducts();
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      
-      console.log('📦 Step 2: Current products:', products);
+      console.log('🛒 Starting purchase...');
       
       if (!products || products.length === 0) {
-        throw new Error('No products available. Check Google Play Console.');
+        throw new Error('No products available');
       }
       
-      const product = products[0];
-      console.log('💳 Step 3: Purchasing product:', product.productId);
-      console.log('💰 Product details:', product);
-
-      // В версии 14+ requestPurchase принимает объект с sku
-      await requestPurchaseV14({ 
-        sku: product.productId,
-      });
-
-      console.log('✅ Purchase request sent successfully');
-      // purchaseUpdatedListener обработает результат
-      return { success: true };
-
+      // Получаем offerings заново для актуального packageToPurchase
+      const offerings = await Purchases.getOfferings();
+      
+      if (!offerings.current || offerings.current.availablePackages.length === 0) {
+        throw new Error('No offerings available');
+      }
+      
+      const packageToPurchase = offerings.current.availablePackages[0];
+      console.log('💳 Purchasing package:', packageToPurchase.identifier);
+      
+      // Покупка
+      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
+      console.log('📊 Purchase result:', customerInfo);
+      
+      // Проверяем результат
+      const isPremium = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      
+      if (isPremium) {
+        setHasPremium(true);
+        await AsyncStorage.setItem('hasPremium', 'true');
+        console.log('✅ Purchase successful! Premium activated.');
+        return { success: true };
+      } else {
+        console.warn('⚠️ Purchase completed but premium not active');
+        return { success: false, error: 'Premium not activated' };
+      }
+      
     } catch (error) {
-      console.error('❌ Error purchasing:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-
-      if (error.code === 'E_USER_CANCELLED') {
+      console.error('❌ Purchase error:', error);
+      
+      if (error.userCancelled) {
+        console.log('ℹ️ User cancelled purchase');
         return { success: false, cancelled: true };
       }
-
-      return { success: false, error: error.message || 'Unknown error' };
+      
+      return { success: false, error: error.message };
     }
   };
 
   const restorePurchases = async () => {
     try {
       console.log('🔄 Restoring purchases...');
-
-      const purchases = await getAvailablePurchasesV14();
-      console.log('📋 Found purchases:', purchases);
-
-      if (purchases && purchases.length > 0) {
-        const hasPurchased = purchases.some((purchase) =>
-          PRODUCT_IDS.includes(purchase.productId)
-        );
-
-        if (hasPurchased) {
-          await AsyncStorage.setItem('hasPremium', 'true');
-          setHasPremium(true);
-          return { success: true, message: 'Покупка восстановлена' };
-        }
+      
+      const customerInfo = await Purchases.restorePurchases();
+      const isPremium = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+      
+      if (isPremium) {
+        setHasPremium(true);
+        await AsyncStorage.setItem('hasPremium', 'true');
+        console.log('✅ Purchases restored');
+        return { success: true, message: 'Покупка восстановлена' };
+      } else {
+        console.log('ℹ️ No purchases to restore');
+        return { success: false, message: 'Покупки не найдены' };
       }
-
-      return { success: false, message: 'Покупки не найдены' };
-
     } catch (error) {
-      console.error('❌ Error restoring:', error);
-      return { success: false, error };
+      console.error('❌ Restore error:', error);
+      return { success: false, error: error.message };
     }
   };
 
@@ -256,7 +183,7 @@ const PremiumProviderBase = ({ children }) => {
     try {
       await AsyncStorage.removeItem('hasPremium');
       setHasPremium(false);
-      console.log('🔄 Premium reset');
+      console.log('🔄 Premium reset (local only)');
     } catch (error) {
       console.error('Error resetting premium:', error);
     }
@@ -277,9 +204,6 @@ const PremiumProviderBase = ({ children }) => {
     </PremiumContext.Provider>
   );
 };
-
-// В версии 14+ нужно обернуть в withIAPContext
-export const PremiumProvider = withIAPContext(PremiumProviderBase);
 
 export const usePremium = () => {
   const context = useContext(PremiumContext);

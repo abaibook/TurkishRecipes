@@ -27,14 +27,7 @@
       ]
     },
     "plugins": [
-      "expo-router",
-      [
-        "react-native-iap",
-        {
-          "billingKeyVersion": 8,
-          "androidBillingVersion": "6.0.1"
-        }
-      ]
+      "expo-router"
     ],
     "extra": {
       "eas": {

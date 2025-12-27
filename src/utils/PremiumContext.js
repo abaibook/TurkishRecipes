@@ -9,7 +9,7 @@ const PremiumContext = createContext();
 // API ключи из RevenueCat Dashboard
 const REVENUE_CAT_API_KEY = Platform.select({
   ios: 'test_bkdEHCGHPYHAiZDLbiCZEVOiyRc',
-  android: 'test_bkdEHCGHPYHAiZDLbiCZEVOiyRc',
+  android: 'goog_DyzrRWypNOQmqsYqxbJJhDZKtht',
 });
 
 // Имя entitlement из RevenueCat Dashboard

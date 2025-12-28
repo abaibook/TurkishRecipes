@@ -14,7 +14,8 @@
     },
     "ios": {
       "bundleIdentifier": "com.abaibook.turkishrecipes",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.abaibook.turkishrecipes",

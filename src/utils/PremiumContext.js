@@ -8,7 +8,7 @@ const PremiumContext = createContext();
 
 // API ключи из RevenueCat Dashboard
 const REVENUE_CAT_API_KEY = Platform.select({
-  ios: 'test_bkdEHCGHPYHAiZDLbiCZEVOiyRc',
+  ios: 'appl_yzDDiVxmnQiOsGQRPOyPHxWcUZJ',
   android: 'goog_DyzrRWypNOQmqsYqxbJJhDZKtht',
 });
 

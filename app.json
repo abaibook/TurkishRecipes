@@ -2,7 +2,7 @@
   "expo": {
     "name": "TurkishRecipes",
     "slug": "TurkishRecipes",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,10 @@
     "ios": {
       "bundleIdentifier": "com.abaibook.turkishrecipes",
       "supportsTablet": true,
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.abaibook.turkishrecipes",

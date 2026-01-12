@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import { Platform, Alert } from 'react-native';
 
 const PremiumContext = createContext();
 
@@ -75,6 +76,13 @@ export const PremiumProvider = ({ children }) => {
       
       const offerings = await Purchases.getOfferings();
       console.log('📦 Offerings:', offerings);
+
+      // ВРЕМЕННО для диагностики
+      if (Platform.OS === 'ios') {
+        Alert.alert('DEBUG', 
+          'Offerings: ' + JSON.stringify(offerings?.current?.availablePackages?.length || 0)
+        );
+      }
       
       if (offerings.current && offerings.current.availablePackages.length > 0) {
         const packages = offerings.current.availablePackages;
